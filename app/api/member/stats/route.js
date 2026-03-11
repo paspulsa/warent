@@ -1,5 +1,4 @@
-'use client'; // Opsional jika ini dipanggil di client, tapi untuk route.js cukup tambahkan baris bawah:
-export const dynamic = 'force-dynamic'; 
+export const dynamic = 'force-dynamic'; // WAJIB DI BARIS 1 UNTUK MATIKAN PRERENDER
 
 import { NextResponse } from 'next/server';
 import { query } from '@/config/db';
@@ -8,19 +7,30 @@ import { jwtVerify } from 'jose';
 
 export async function GET() {
     try {
-        const token = cookies().get('token')?.value;
-        if (!token) return NextResponse.json({ success: false, message: 'Harus login' }, { status: 401 });
+        // 1. Ambil Cookie
+        const cookieStore = cookies();
+        const token = cookieStore.get('token')?.value;
+        
+        if (!token) {
+            return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+        }
 
+        // 2. Verifikasi JWT
         const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'secret_wa_blast_123');
         const { payload } = await jwtVerify(token, secret);
         const userId = payload.id;
 
-        // Ambil Data User (Gunakan try-catch lokal agar jika satu gagal, tidak semua mati)
-        const userRows = await query('SELECT wallet_balance, referral_code FROM users WHERE id = ?', [userId]);
-        const user = userRows[0] || {};
+        // 3. Jalankan Query ke Database
+        const userRows = await query(
+            'SELECT wallet_balance, referral_code FROM users WHERE id = ?', 
+            [userId]
+        );
+        
+        if (!userRows || userRows.length === 0) {
+            return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 });
+        }
+        const user = userRows[0];
 
-        // Ambil Statistik WhatsApp
-        // Pastikan tabel whatsapp_accounts sudah ada kolom total_sent & total_failed
         const waStats = await query(
             `SELECT 
                 COUNT(*) as total_accounts,
@@ -31,7 +41,6 @@ export async function GET() {
             [userId]
         );
 
-        // Ambil Total Bonus Referral
         const refStats = await query(
             "SELECT SUM(amount) as total_ref_bonus FROM transactions WHERE user_id = ? AND transaction_type = 'Referral_Bonus'",
             [userId]
@@ -51,10 +60,10 @@ export async function GET() {
         });
 
     } catch (error) {
-        console.error("STATS_API_ERROR:", error); // Muncul di log Coolify
-        return NextResponse.json({ 
-            success: false, 
-            message: 'Database belum siap atau koneksi terputus' 
-        }, { status: 500 });
+        console.error("STATS_ERROR:", error.message);
+        return NextResponse.json(
+            { success: false, message: 'Gagal memuat data' }, 
+            { status: 500 }
+        );
     }
 }
