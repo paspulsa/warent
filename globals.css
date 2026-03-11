@@ -2,7 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Reset dasar biar tampilan bersih */
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-rgb: 249, 250, 251;
+}
+
 body {
-  background: #f8fafc;
-  color: #1e293b;
+  color: rgb(var(--foreground-rgb));
+  background: rgb(var(--background-rgb));
+  margin: 0;
+  padding: 0;
 }
