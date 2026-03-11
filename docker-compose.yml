@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  # 1. Database MySQL
+  mysql-db:
+    image: mysql:8.0
+    container_name: wa_blast_db
+    restart: always
+    environment:
+      MYSQL_DATABASE: ${DB_NAME:-rent_wa_blast}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    networks:
+      - wa_network
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  # 2. Next.js Frontend & API
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    container_name: wa_blast_web
+    restart: always
+    environment:
+      - DB_HOST=mysql-db
+      - DB_USER=root
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME:-rent_wa_blast}
+      - JWT_SECRET=${JWT_SECRET}
+      - NEXT_PUBLIC_SOCKET_URL=${NEXT_PUBLIC_SOCKET_URL}
+    ports:
+      - "3000:3000"
+    depends_on:
+      mysql-db:
+        condition: service_healthy
+    networks:
+      - wa_network
+
+  # 3. WhatsApp Background Worker (Baileys + Socket.io)
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    command: npm run worker
+    container_name: wa_blast_worker
+    restart: always
+    environment:
+      - DB_HOST=mysql-db
+      - DB_USER=root
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=${DB_NAME:-rent_wa_blast}
+      - WORKER_PORT=${WORKER_PORT:-5000}
+    volumes:
+      - ./sessions:/app/sessions
+    ports:
+      - "5000:5000"
+    depends_on:
+      mysql-db:
+        condition: service_healthy
+    networks:
+      - wa_network
+
+networks:
+  wa_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
