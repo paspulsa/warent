@@ -10,7 +10,6 @@ export default function MemberLayout({ children }) {
   const menus = [
     { name: 'Dashboard', href: '/dashboard', icon: '🏠' },
     { name: 'WhatsApp Saya', href: '/whatsapp', icon: '📱' },
-    { name: 'Mulai Blast', href: '/blast', icon: '🚀' },
     { name: 'Penarikan Dana', href: '/withdrawal', icon: '💰' },
     { name: 'Profil & Bank', href: '/profile', icon: '👤' },
   ];
